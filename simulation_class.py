@@ -7,7 +7,7 @@ import warnings
 logging.getLogger().setLevel(logging.ERROR)
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-from aquacrop import AquaCropModel, Soil, Crop, InitialWaterContent, FieldMngt, GroundWater, IrrigationManagement
+from aquacrop import AquaCropModel, Soil, Crop, InitialWaterContent, IrrigationManagement
 from aquacrop.utils import prepare_weather, get_filepath
 import pandas as pd
 import threading
@@ -39,6 +39,7 @@ class Simulation:
         model.run_model(till_termination=True)
         return model._outputs.water_storage, model._outputs.final_stats
     
+# Test functionality
 if __name__ == "__main__":
     start_date = '1982/05/01'
     end_date = '1983/05/01'
@@ -81,7 +82,7 @@ if __name__ == "__main__":
             sim_id, moisture = result_queue.get()
             moisture_levels[sim_id] = moisture
         
-        irrigate = [1 if x < 0.71 else 0 for x in moisture_levels]
+        irrigate = [1 if x < 0.9 else 0 for x in moisture_levels]
         for i, val in enumerate(irrigate):
             if val == 1:
                 new_week = pd.DataFrame({
