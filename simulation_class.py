@@ -42,6 +42,7 @@ class Simulation:
 if __name__ == "__main__":
     start_date = '1982/05/01'
     end_date = '1983/05/01'
+    current_end = pd.to_datetime(start_date) + pd.Timedelta(days=7)
 
     simulations = []
     sand = 10
@@ -50,11 +51,11 @@ if __name__ == "__main__":
         silt = 100 - sand - clay
         simulations.append(Simulation((sand, clay, silt), start_date, sim_id))
         sim_id += 1
-    # simulations[0].run_sim()
     
-    current_end = pd.to_datetime(start_date) + pd.Timedelta(days=7)
+    schedules = [pd.DataFrame(columns=['Date', 'Depth']) for _ in range(len(simulations))]
 
-    def run_simulation_in_thread(sim, q, schedule, end):
+    # Soil values are in the format [Sand, Clay]        
+    def run_simulations_get_moisture(sim, q, schedule, end):
         water_storage, _ = sim.run_sim(schedule, end)
         # Traverse the dataframe backwards to get the last day's moisture value
         for i in range(len(water_storage) - 1, 0, -1):
@@ -63,33 +64,64 @@ if __name__ == "__main__":
                 break
         q.put((sim.id, moisture_percentage))
 
+    while current_end < pd.to_datetime(end_date):
+        print(f'Running simulation for week ending {current_end}')
+        result_queue = queue.Queue()
+        threads = []
+        for i, simulation in enumerate(simulations):
+            thread = threading.Thread(target=run_simulations_get_moisture, args=(simulation, result_queue, schedules[i], current_end))
+            threads.append(thread)
+            thread.start()
+        
+        for thread in threads:
+            thread.join()
+        
+        moisture_levels = [None] * len(simulations)
+        while not result_queue.empty():
+            sim_id, moisture = result_queue.get()
+            moisture_levels[sim_id] = moisture
+        
+        irrigate = [1 if x < 0.71 else 0 for x in moisture_levels]
+        for i, val in enumerate(irrigate):
+            if val == 1:
+                new_week = pd.DataFrame({
+                    'Date' : [current_end + pd.Timedelta(days=7)],
+                    'Depth' : [25]
+                })
+                schedules[i] = pd.concat([schedules[i], new_week], ignore_index=True)
+        
+        irrigated_fields = [i for i, val in enumerate(irrigate) if val == 1]
+        print(f'Irrigated fields for week ending {current_end}: {", ".join(map(str, irrigated_fields))}')
+        current_end += pd.Timedelta(days=7)
+        print('----------------------------------------')
+    print('Running final simulations')
+
+    def run_final_simulation_threads(sim, q, schedule, end):
+        _, final_results = sim.run_sim(schedule, end)
+        q.put((sim.id, final_results))
 
     result_queue = queue.Queue()
     threads = []
-    schedules = [pd.DataFrame(columns=['Date', 'Depth'])] * len(simulations)  # Initial empty schedule
     for i, simulation in enumerate(simulations):
-        thread = threading.Thread(target=run_simulation_in_thread, args=(simulation, result_queue, schedules[i], current_end))
+        thread = threading.Thread(target=run_final_simulation_threads, args=(simulation, result_queue, schedules[i], pd.to_datetime(end_date)))
         threads.append(thread)
         thread.start()
     
     for thread in threads:
         thread.join()
-    
-    moisture_levels = [None] * len(simulations)
-    while not result_queue.empty():
-        sim_id, moisture = result_queue.get()
-        moisture_levels[sim_id] = moisture
-    
-    print(moisture_levels)
-    irrigate = [1 if x < 0.71 else 0 for x in moisture_levels]
-    print(irrigate)
-    for i, val in enumerate(irrigate):
-        if val == 1:
-            print(f'field {i} is below the irrigation threshold. Irrigating.')
-            new_week = pd.DataFrame({
-                'Date' : [current_end + pd.Timedelta(days=7)],
-                'Depth' : [25]
-            })
-            schedules[i] = pd.concat([schedules[i], new_week], ignore_index=True)
-        print(schedules[i])
 
+    final_results = [None] * len(simulations)
+    while not result_queue.empty():
+        sim_id, results = result_queue.get()
+        final_results[sim_id] = results
+
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_colwidth', None)
+    for i, results in enumerate(final_results):
+        print(f'Simulation {i} results:')
+        print(results)
+
+    print('All simulations done.')
+    
