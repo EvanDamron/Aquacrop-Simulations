@@ -46,26 +46,29 @@ if __name__ == "__main__":
     current_end = pd.to_datetime(start_date) + pd.Timedelta(days=7)
 
     simulations = []
-    sand = 10
+    sand = 20
     sim_id = 0
-    for clay in range(10, 91, 10):
+    for clay in range(20, 61, 5):
         silt = 100 - sand - clay
+        print(f'Creating simulation for soil type ({sand}, {silt}, {clay})')
         simulations.append(Simulation((sand, clay, silt), start_date, sim_id))
         sim_id += 1
-    
+
     schedules = [pd.DataFrame(columns=['Date', 'Depth']) for _ in range(len(simulations))]
 
-    # Soil values are in the format [Sand, Clay]        
     def run_simulations_get_moisture(sim, q, schedule, end):
-        water_storage, _ = sim.run_sim(schedule, end)
-        # Traverse the dataframe backwards to get the last day's moisture value
-        for i in range(len(water_storage) - 1, 0, -1):
-            if water_storage['growing_season'].iloc[i] == 1:
-                moisture_percentage = water_storage['th1'].iloc[i] / sim.SAT
-                break
-        q.put((sim.id, moisture_percentage))
+        try:
+            water_storage, _ = sim.run_sim(schedule, end)
+            q.put((sim.id, water_storage))
+        except Exception as e:
+            print(f'Error running simulation {sim.id}: {e}')
+            q.put((sim.id, None))
+            exit(1)
 
+    harvested = False
     while current_end < pd.to_datetime(end_date):
+        if harvested:
+            break
         print(f'Running simulation for week ending {current_end}')
         result_queue = queue.Queue()
         threads = []
@@ -79,10 +82,17 @@ if __name__ == "__main__":
         
         moisture_levels = [None] * len(simulations)
         while not result_queue.empty():
-            sim_id, moisture = result_queue.get()
-            moisture_levels[sim_id] = moisture
+            sim_id, water_storage = result_queue.get()
+            # Traverse the dataframe backwards to get the last day's moisture value
+            for i in range(len(water_storage) - 1, 0, -1):
+                if water_storage['growing_season'].iloc[i] == 1:
+                    if i < len(water_storage) - 2:   # Check for more than one empty day at end of dataframe
+                        harvested = True
+                    moisture_percentage = water_storage['th1'].iloc[i] / simulations[sim_id].SAT
+                    break
+            moisture_levels[sim_id] = moisture_percentage
         
-        irrigate = [1 if x < 0.9 else 0 for x in moisture_levels]
+        irrigate = [1 if x < 0.7 else 0 for x in moisture_levels]
         for i, val in enumerate(irrigate):
             if val == 1:
                 new_week = pd.DataFrame({
@@ -98,8 +108,12 @@ if __name__ == "__main__":
     print('Running final simulations')
 
     def run_final_simulation_threads(sim, q, schedule, end):
-        _, final_results = sim.run_sim(schedule, end)
-        q.put((sim.id, final_results))
+        try:
+            final_water_storage, final_results = sim.run_sim(schedule, end)
+            q.put((sim.id, final_results, final_water_storage))
+        except Exception as e:
+            print(f'Error running simulation {sim.id}: {e}')
+            q.put((sim.id, None, None))
 
     result_queue = queue.Queue()
     threads = []
@@ -112,17 +126,22 @@ if __name__ == "__main__":
         thread.join()
 
     final_results = [None] * len(simulations)
+    final_storage = [None] * len(simulations)
     while not result_queue.empty():
-        sim_id, results = result_queue.get()
+        sim_id, results, water_storage = result_queue.get()
         final_results[sim_id] = results
+        final_storage[sim_id] = water_storage
 
-    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_rows', 20)
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', None)
     pd.set_option('display.max_colwidth', None)
     for i, results in enumerate(final_results):
         print(f'Simulation {i} results:')
         print(results)
+        # print('----------------------------------------')
+        # print(f'Simulation {i} water storage:')
+        # print(final_storage[i])
 
     print('All simulations done.')
     
