@@ -170,3 +170,6 @@ def epsilonGreedy(fig1, ax1, HP_gdf, UHP_gdf, SHP_gdf, sensorNames, df,
         #         bestSHP = selected.copy()
         features = getSensorNames(bestSHP.geometry, sensorNames)
         minMSE = getMSE(features, originalDF)
+
+if __name__ == '__main__':
+    epsilonGreedy()
