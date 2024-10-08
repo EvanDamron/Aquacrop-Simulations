@@ -1,0 +1,15 @@
+The program took 9 minutes and 29 seconds to run
+final energy of best = 29124.492986448335 joules
+The best path's mse was 0.0003401476610086864, and it was found on the 172th iteration
+It consumed 29124.492986448335 joules and traveled 2601.338187533721 meters
+sensors used: ['sensor_18', 'sensor_15', 'sensor_22', 'sensor_6', 'sensor_2', 'sensor_1', 'sensor_16', 'sensor_17', 'sensor_10', 'sensor_9', 'sensor_12', 'sensor_8', 'sensor_3', 'sensor_21'] (14)
+best SHP:
+                  geometry        energy
+0   POINT (537.006 87.063)  29124.492986
+1  POINT (824.372 326.326)  29124.492986
+2  POINT (612.165 380.696)  29124.492986
+3  POINT (463.938 462.769)  29124.492986
+4  POINT (575.265 572.248)  29124.492986
+5   POINT (295.627 729.69)  29124.492986
+6  POINT (198.393 597.393)  29124.492986
+7  POINT (170.891 236.839)  29124.492986finalMSE: 0.0003401476610086864
