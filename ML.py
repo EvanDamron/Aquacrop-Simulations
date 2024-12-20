@@ -289,9 +289,11 @@ def getInformationGain(selectedSensors, df):
     for joint, prob in joint_counts.items():
         marginal_targets[joint[1]] += prob
 
-    # Compute mutual information
+    # Compute mutual information, which is the better term for this
     MI = 0
     for (f, t), joint_prob in joint_counts.items():
+        # P(f, t) * log(P(f, t) / (P(f) * P(t)))
+        # Equivalent to H(t) - H(t|f)
         MI += joint_prob * np.log2(joint_prob / (marginal_features[f] * marginal_targets[t]))
 
     return MI
@@ -449,3 +451,9 @@ def getSyntheticDF(df):
     synthetic_df = pd.DataFrame(syntheticArray, columns=columns)
     np.random.set_state(originalSeed)
     return synthetic_df
+
+if __name__ == '__main__':
+    df = pd.read_csv('training_data0514.csv', index_col=0)
+    print(df)
+    testModels(df)
+    

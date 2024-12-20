@@ -819,7 +819,9 @@ def updateIGMSEPlot(newX, newY1, newY2, line1, line2, ax2, ax3, fig, x, y1, y2):
 
 
 def printResults(finalSHP, finalIteration, finalDistance, finalMSE, sensorNames):
-    print(f"final energy of best = {finalSHP['energy'][0]} joules")
+    if len(finalSHP) == 0:
+        print('No path found')
+        return
     print(f"The best path's mse was {finalMSE}, and it was found on the {finalIteration}th iteration")
     print(f"It consumed {finalSHP['energy'][0]} joules and traveled {finalDistance} meters")
     sensors = getSensorNames(finalSHP['geometry'], sensorNames)
@@ -831,11 +833,15 @@ def writeResults(finalSHP, finalIteration, finalDistance, finalMSE, sensorNames,
     runTime = endTime - startTime
     minutes = int(runTime // 60)
     seconds = int(runTime % 60)
+    if len(finalSHP) == 0:
+        final_energy = 0
+    else:
+        final_energy = finalSHP['energy'][0]
     with open(outputTextName, mode='w', encoding='utf-8') as file:
         file.write(f"The program took {minutes} minutes and {seconds} seconds to run\n")
-        file.write(f"final energy of best = {finalSHP['energy'][0]} joules\n")
+        file.write(f"final energy of best = {final_energy} joules\n")
         file.write(f"The best path's mse was {finalMSE}, and it was found on the {finalIteration}th iteration\n")
-        file.write(f"It consumed {finalSHP['energy'][0]} joules and traveled {finalDistance} meters\n")
+        file.write(f"It consumed {final_energy} joules and traveled {finalDistance} meters\n")
         sensors = getSensorNames(finalSHP['geometry'], sensorNames)
         file.write(f"sensors used: {sensors} ({len(sensors)})\n")
         file.write(f"best SHP:\n{finalSHP}")

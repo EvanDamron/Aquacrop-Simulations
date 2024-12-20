@@ -23,8 +23,9 @@ class Simulation:
         self.SAT = self.soil.profile['th_s'][0]
         path = get_filepath('champion_climate.txt')
         self.wdf = prepare_weather(path)
-        self.initWC = InitialWaterContent(value=['FC'])
-        self.sim_start = sim_start
+        # self.initWC = InitialWaterContent(value=['FC'])
+        self.initWC = InitialWaterContent(wc_type='Num', value=[0.2])
+        self.sim_start = sim_start.strftime('%Y/%m/%d')
         self.crop = Crop('Maize', planting_date=pd.to_datetime(sim_start).strftime('%m/%d'))
 
     def run_sim(self, schedule, end_date):
@@ -37,7 +38,7 @@ class Simulation:
                               self.initWC,
                               irrigation) 
         model.run_model(till_termination=True)
-        return model._outputs.water_storage, model._outputs.final_stats
+        return model._outputs.water_storage, model._outputs.final_stats, model._outputs.water_flux
     
 # Test functionality
 if __name__ == "__main__":

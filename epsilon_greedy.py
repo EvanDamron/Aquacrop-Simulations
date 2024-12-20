@@ -129,19 +129,15 @@ def epsilonGreedy(fig1, ax1, HP_gdf, sensorNames, df, numLoops, startTime,
     SHP_gdf = HP_gdf.iloc[0:0].copy()
 
     originalDF = df.copy()
-    discreteDF = discretizeData(df)
+    if not exhaustive:
+        df = discretizeData(df)
     # discreteDF = None
     signal.signal(signal.SIGINT, signal_handler)
     pd.set_option('display.max_rows', 30)
     pd.set_option('display.max_columns', None)
     # print(discreteDF)
     # print(originalDF)
-    if exhaustive:
-        # x, y, line, ax2, fig2 = createMSEPlot()
-        x, y1, y2, line1, line2, ax2, ax3, fig2 = createIGMSEPlot()
-    else:
-        x, y1, y2, line1, line2, ax2, ax3, fig2 = createIGMSEPlot()
-        IGToSHP = {}
+    x, y1, y2, line1, line2, ax2, ax3, fig2 = createIGMSEPlot()
 
     print(f"Total number of Hoverpoints: {len(HP_gdf)}")
     print(f"Total number of sensors: {len(getSensorNames(HP_gdf['geometry'], sensorNames))}")
@@ -172,14 +168,10 @@ def epsilonGreedy(fig1, ax1, HP_gdf, sensorNames, df, numLoops, startTime,
         elif randomNumber < raProb + rrProb:
             UHP_gdf, SHP_gdf = remRandomHP(UHP_gdf, SHP_gdf)
         elif randomNumber < raProb + rrProb + baProb:
-            if not exhaustive:
-                df = discreteDF
             UHP_gdf, SHP_gdf = addBestHP(unselected=UHP_gdf, unselectedIB=pointsInBudget, selected=SHP_gdf,
                                          sensorNames=sensorNames, df=df, energyWeight=energyWeight,
                                          exhaustive=exhaustive)
         else:
-            if not exhaustive:
-                df = discreteDF
             UHP_gdf, SHP_gdf = remBestHP(UHP_gdf, SHP_gdf, sensorNames=sensorNames, df=df, energyWeight=energyWeight,
                                          joulesPerMeter=joulesPerMeter, joulesPerSecond=joulesPerSecond,
                                          dataSize=dataSize, transferRate=transferRate, exhaustive=exhaustive)
@@ -191,6 +183,7 @@ def epsilonGreedy(fig1, ax1, HP_gdf, sensorNames, df, numLoops, startTime,
         features = getSensorNames(SHP_gdf['geometry'], sensorNames)
         if exhaustive:
             mse = getMSE(features, originalDF)
+            IG = 1
             if mse < minMSE:
                 minMSE = mse
                 bestSHP = SHP_gdf.copy()
@@ -198,18 +191,12 @@ def epsilonGreedy(fig1, ax1, HP_gdf, sensorNames, df, numLoops, startTime,
         else:
             # mse = getMSE(features, originalDF)
             mse = 1
-            if mse < minMSE:
-                minMSE = mse
-
-        IG = getInformationGain(features, discreteDF)
-        if IG > maxIG:    # and len(SHP_gdf) > 8:
-            maxIG = IG
-            if not exhaustive:
+            IG = getInformationGain(features, df)
+            if IG > maxIG:
+                maxIG = IG
                 bestSHP = SHP_gdf.copy()
                 iterationOfBest = loopCount
-        # if not exhaustive:
-        #     if IG not in IGToSHP.keys():
-        #         IGToSHP[IG] = SHP_gdf.copy()
+
         if SHP_gdf.empty:
             totalEnergy = 0
         else:
@@ -223,15 +210,14 @@ def epsilonGreedy(fig1, ax1, HP_gdf, sensorNames, df, numLoops, startTime,
         print(f"Total number of sensors visited: {len(getSensorNames(SHP_gdf['geometry'], sensorNames))}")
         if exhaustive:
             print(f"current mse: {mse}, lowest mse yet: {minMSE}")
-            # updateMSEPlot(newX=loopCount, newY=mse, ax=ax2, fig=fig2, x=x, y=y, line=line)
-            updateIGMSEPlot(newX=loopCount, newY1=mse, newY2=IG,
-                            line1=line1, line2=line2, ax2=ax2, ax3=ax3,
-                            fig=fig2, x=x, y1=y1, y2=y2)
         else:
-            print(f"current mse: {mse}, lowest mse yet: {minMSE}")
-            updateIGMSEPlot(newX=loopCount, newY1=mse, newY2=IG, line1=line1, line2=line2, ax2=ax2, ax3=ax3,
-                            fig=fig2, x=x, y1=y1, y2=y2)
-        print(f"current Information Gain: {IG}, largest IG yet: {maxIG}")
+            print(f"Current Information Gain: {IG}, largest IG yet: {maxIG}")
+        
+        updateIGMSEPlot(newX=loopCount, newY1=mse, newY2=IG,
+                        line1=line1, line2=line2, ax2=ax2, ax3=ax3,
+                        fig=fig2, x=x, y1=y1, y2=y2)
+
+        # print(f"current Information Gain: {IG}, largest IG yet: {maxIG}")
         pointsInBudget = getPointsInBudget(UHP_gdf, SHP_gdf, sensorNames, energyBudget, joulesPerMeter, joulesPerSecond,
                                            dataSize, transferRate)
 
@@ -293,11 +279,21 @@ def epsilonGreedy(fig1, ax1, HP_gdf, sensorNames, df, numLoops, startTime,
         plt.show()
 
 if __name__ == '__main__':
-    training_data = pd.read_csv('training_data.csv', index_col=0)
-    # print(training_data)
-    fig, ax, hoverPoints, sensorNames, sensor_gdf = create_map(10, 70, training_data.columns)
+    # training_data = pd.read_csv('training_data0514.csv', index_col=0)
+    soil_seeds = [1, 3, 4, 5, 7, 8, 9, 10, 12, 13]
+    # soil_seeds = [1, 3]
+    # data_paths = ['training_data0514_seed3.csv', 'training_data0514_seed4.csv', 'training_data0514_seed5.csv', 'training_data0514_seed7.csv']
+    # print(training_data)[;[]pl,[]]
     # plt.show()
-    epsilonGreedy(fig1=fig, ax1=ax, HP_gdf=hoverPoints, sensorNames=sensorNames, df=training_data, numLoops=200,
-                  startTime=time.time(), savePlots=True, pathPlotName='pathPlot3.png', msePlotName='msePlot3.png',
-                  outputTextName='output3.txt', energyWeight=0, energyBudget=30000, joulesPerMeter=10,
-                  joulesPerSecond=35, dataSize=100, transferRate=9, exhaustive=True)
+    energy_budgets = [10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000]
+    for seed in soil_seeds:
+        training_data = pd.read_csv(f'training_data0514_seed{seed}.csv', index_col=0)
+        for budget in energy_budgets:
+            np.random.seed(0)
+            random.seed(0)
+            budget_str = f'{budget//1000}k'
+            fig, ax, hoverPoints, sensorNames, sensor_gdf = create_map(15, 70, training_data.columns)
+            epsilonGreedy(fig1=fig, ax1=ax, HP_gdf=hoverPoints, sensorNames=sensorNames, df=training_data, numLoops=200,
+                        startTime=time.time(), savePlots=True, pathPlotName=f'Energy Budget Experiments Soils IG/seed{seed}/pathPlot{budget_str}.png', msePlotName=f'Energy Budget Experiments Soils IG/seed{seed}/msePlot{budget_str}.png',
+                        outputTextName=f'Energy Budget Experiments Soils IG/seed{seed}/output{budget_str}.txt', energyWeight=0, energyBudget=budget, joulesPerMeter=10,
+                        joulesPerSecond=35, dataSize=100, transferRate=9, exhaustive=False)
